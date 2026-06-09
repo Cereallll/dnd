@@ -5,7 +5,8 @@ const fs = require('fs');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(cors());
@@ -101,6 +102,6 @@ app.put('/api/grid-size', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`D&D Board server running on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`D&D Board server running on http://${HOST}:${PORT}`);
 });

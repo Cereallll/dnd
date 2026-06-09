@@ -37,13 +37,13 @@ function detectImageBrightness(imageUrl) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = function() {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = img.width;
+    tempCanvas.height = img.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(img, 0, 0);
     
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
     const data = imageData.data;
     
     let brightness = 0;
@@ -176,12 +176,12 @@ function isGridSquareOccupied(gridX, gridY, excludeId = null) {
 }
 
 // Find nearest available grid square
-function findAvailableGridSquare(startX, startY) {
+function findAvailableGridSquare(startX, startY, excludeId = null) {
   const gridSize = boardState.gridSize;
   const startGridX = Math.round(startX / gridSize);
   const startGridY = Math.round(startY / gridSize);
   
-  if (!isGridSquareOccupied(startGridX, startGridY)) {
+  if (!isGridSquareOccupied(startGridX, startGridY, excludeId)) {
     return { x: startGridX * gridSize, y: startGridY * gridSize };
   }
   
@@ -194,7 +194,7 @@ function findAvailableGridSquare(startX, startY) {
         const gridX = startGridX + dx;
         const gridY = startGridY + dy;
         
-        if (!isGridSquareOccupied(gridX, gridY)) {
+        if (!isGridSquareOccupied(gridX, gridY, excludeId)) {
           return { x: gridX * gridSize, y: gridY * gridSize };
         }
       }
@@ -290,15 +290,27 @@ function renderCharacters() {
       </div>
     `;
 
-    // Drag functionality
-    token.addEventListener('mousedown', (e) => {
-      if (e.button === 0 && e.detail === 1) startDrag(e);
-    });
+    // Drag functionality - only start on single click, not double-click
+    let clickCount = 0;
+    let clickTimeout;
     
-    // Click to edit (double-click)
-    token.addEventListener('dblclick', (e) => {
-      e.stopPropagation();
-      openCharacterEditor(char.id);
+    token.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      
+      clickCount++;
+      if (clickCount === 1) {
+        clickTimeout = setTimeout(() => {
+          if (clickCount === 1) {
+            startDrag(e);
+          }
+          clickCount = 0;
+        }, 200);
+      } else if (clickCount === 2) {
+        clearTimeout(clickTimeout);
+        clickCount = 0;
+        e.stopPropagation();
+        openCharacterEditor(char.id);
+      }
     });
     
     // Right-click to delete
@@ -364,7 +376,7 @@ async function stopDrag() {
   const gridY = Math.round(y / gridSize);
   
   if (isGridSquareOccupied(gridX, gridY, id)) {
-    const availablePos = findAvailableGridSquare(x, y);
+    const availablePos = findAvailableGridSquare(x, y, id);
     x = availablePos.x;
     y = availablePos.y;
   }

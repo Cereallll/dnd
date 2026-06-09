@@ -16,30 +16,33 @@
     <!-- Control Panel -->
     <div class="control-panel">
       <div class="control-section">
-        <h3>Background Upload</h3>
+        <h3>🎨 Background</h3>
         <input type="file" id="backgroundInput" accept="image/*">
         <button id="uploadBtn">Upload Background</button>
       </div>
 
       <div class="control-section">
-        <h3>Add Character</h3>
+        <h3>🧙 Add Character</h3>
         <input type="text" id="characterName" placeholder="Character Name" maxlength="20">
         <input type="color" id="characterColor" value="#FF6B6B">
+        <input type="number" id="characterHP" placeholder="Max HP" min="1" value="10">
+        <input type="number" id="characterAC" placeholder="AC" min="0" value="10">
         <button id="addCharacterBtn">Add Character Token</button>
       </div>
 
       <div class="control-section">
-        <h3>Grid Settings</h3>
+        <h3>📏 Grid Settings</h3>
         <label>Grid Square Size (pixels):</label>
         <input type="number" id="gridSize" value="40" min="20" max="100">
         <button id="updateGridBtn">Update Grid</button>
       </div>
 
       <div class="control-section">
-        <h3>Instructions</h3>
-        <p>• Drag character tokens to move them</p>
-        <p>• Right-click to remove a character</p>
-        <p>• Upload an image as your battle map</p>
+        <h3>📖 Instructions</h3>
+        <p>• <strong>Drag</strong> tokens to move them</p>
+        <p>• <strong>Click</strong> token to edit HP/AC</p>
+        <p>• <strong>Right-click</strong> to remove</p>
+        <p>• <strong>Scroll</strong> on token to damage/heal</p>
       </div>
     </div>
 
@@ -47,6 +50,41 @@
     <div class="canvas-container">
       <canvas id="gameBoard"></canvas>
       <div id="characterTokens" class="tokens-container"></div>
+    </div>
+  </div>
+
+  <!-- Character Editor Modal -->
+  <div id="characterModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Edit Character</h2>
+      <div class="modal-body">
+        <label>Name:</label>
+        <input type="text" id="modalCharacterName" maxlength="20">
+        
+        <label>Current HP:</label>
+        <input type="number" id="modalCurrentHP" min="0">
+        
+        <label>Max HP:</label>
+        <input type="number" id="modalMaxHP" min="1">
+        
+        <label>AC (Armor Class):</label>
+        <input type="number" id="modalAC" min="0">
+        
+        <label>Initiative:</label>
+        <input type="number" id="modalInitiative" step="0.1">
+        
+        <label>Status:</label>
+        <select id="modalStatus">
+          <option value="active">Active</option>
+          <option value="unconscious">Unconscious</option>
+          <option value="dead">Dead</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button id="saveCharacterBtn" class="btn-primary">Save</button>
+        <button id="cancelCharacterBtn" class="btn-secondary">Cancel</button>
+      </div>
     </div>
   </div>
 

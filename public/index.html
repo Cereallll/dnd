@@ -31,29 +31,21 @@
           </div>
           <div style="flex: 1;">
             <label style="font-size: 0.85em;">Max HP</label>
-            <input type="number" id="characterHP" placeholder="10" min="1" value="10">
+            <input type="number" id="characterHP" placeholder="10" min="1" max="200" value="10">
           </div>
           <div style="flex: 1;">
             <label style="font-size: 0.85em;">AC</label>
-            <input type="number" id="characterAC" placeholder="10" min="0" value="10">
+            <input type="number" id="characterAC" placeholder="10" min="0" max="50" value="10">
           </div>
         </div>
-        <button id="addCharacterBtn">Add Character Token</button>
+        <button id="addCharacterBtn">Add Character</button>
       </div>
 
       <div class="control-section">
-        <h3>📏 Grid Settings</h3>
-        <label>Grid Square Size (pixels):</label>
+        <h3>📏 Grid</h3>
+        <label>Size (pixels):</label>
         <input type="number" id="gridSize" value="80" min="20" max="100">
-        <button id="updateGridBtn">Update Grid</button>
-      </div>
-
-      <div class="control-section">
-        <h3>📖 Instructions</h3>
-        <p>• <strong>Drag</strong> tokens to move them (snaps to grid)</p>
-        <p>• <strong>Double-click</strong> to edit stats</p>
-        <p>• <strong>Right-click</strong> to remove</p>
-        <p>• <strong>Scroll</strong> on token to damage/heal</p>
+        <button id="updateGridBtn">Update</button>
       </div>
     </div>
 
@@ -81,7 +73,7 @@
             <div class="hp-controls">
               <button class="hp-btn" id="hpMinus5">-5</button>
               <button class="hp-btn" id="hpMinus1">-1</button>
-              <input type="number" id="modalCurrentHP" min="0">
+              <input type="number" id="modalCurrentHP" min="0" max="200">
               <button class="hp-btn" id="hpPlus1">+1</button>
               <button class="hp-btn" id="hpPlus5">+5</button>
             </div>
@@ -89,14 +81,14 @@
           
           <div class="stat-group">
             <label>Max HP:</label>
-            <input type="number" id="modalMaxHP" min="1">
+            <input type="number" id="modalMaxHP" min="1" max="200">
           </div>
         </div>
         
         <div class="stat-row">
           <div class="stat-group">
-            <label>AC (Armor Class):</label>
-            <input type="number" id="modalAC" min="0">
+            <label>AC:</label>
+            <input type="number" id="modalAC" min="0" max="50">
           </div>
           
           <div class="stat-group">
@@ -122,7 +114,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button id="saveCharacterBtn" class="btn-primary">Save Changes</button>
+        <button id="saveCharacterBtn" class="btn-primary">Save</button>
         <button id="cancelCharacterBtn" class="btn-secondary">Cancel</button>
       </div>
     </div>

@@ -350,10 +350,7 @@ function drag(e) {
   let x = e.clientX - containerRect.left - dragOffset.x;
   let y = e.clientY - containerRect.top - dragOffset.y;
 
-  // Snap to grid center
-  const gridSize = boardState.gridSize;
-  x = Math.round(x / gridSize) * gridSize;
-  y = Math.round(y / gridSize) * gridSize;
+  
 
   // Clamp to canvas
   x = Math.max(0, Math.min(x, canvas.width - 80));

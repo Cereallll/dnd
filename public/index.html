@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D&D Interactive Board</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>⚔️ D&D Interactive Battle Board</h1>
+    </header>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <div class="control-section">
+        <h3>Background Upload</h3>
+        <input type="file" id="backgroundInput" accept="image/*">
+        <button id="uploadBtn">Upload Background</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Add Character</h3>
+        <input type="text" id="characterName" placeholder="Character Name" maxlength="20">
+        <input type="color" id="characterColor" value="#FF6B6B">
+        <button id="addCharacterBtn">Add Character Token</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Grid Settings</h3>
+        <label>Grid Square Size (pixels):</label>
+        <input type="number" id="gridSize" value="40" min="20" max="100">
+        <button id="updateGridBtn">Update Grid</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Instructions</h3>
+        <p>• Drag character tokens to move them</p>
+        <p>• Right-click to remove a character</p>
+        <p>• Upload an image as your battle map</p>
+      </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="canvas-container">
+      <canvas id="gameBoard"></canvas>
+      <div id="characterTokens" class="tokens-container"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

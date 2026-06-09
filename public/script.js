@@ -8,10 +8,15 @@ let boardState = {
 let selectedToken = null;
 let draggingToken = null;
 let dragOffset = { x: 0, y: 0 };
+let currentEditingCharacterId = null;
 
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
 const tokensContainer = document.getElementById('characterTokens');
+const modal = document.getElementById('characterModal');
+const closeBtn = document.querySelector('.close');
+const saveBtn = document.getElementById('saveCharacterBtn');
+const cancelBtn = document.getElementById('cancelCharacterBtn');
 
 // Resize canvas to fit container
 function resizeCanvas() {
@@ -113,6 +118,8 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
 document.getElementById('addCharacterBtn').addEventListener('click', async () => {
   const name = document.getElementById('characterName').value.trim();
   const color = document.getElementById('characterColor').value;
+  const maxHP = parseInt(document.getElementById('characterHP').value) || 10;
+  const ac = parseInt(document.getElementById('characterAC').value) || 10;
 
   if (!name) {
     alert('Please enter a character name');
@@ -124,15 +131,22 @@ document.getElementById('addCharacterBtn').addEventListener('click', async () =>
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        x: Math.random() * (canvas.width - 50),
-        y: Math.random() * (canvas.height - 50),
+        x: Math.random() * (canvas.width - 80),
+        y: Math.random() * (canvas.height - 100),
         name,
-        color
+        color,
+        maxHP,
+        currentHP: maxHP,
+        ac,
+        initiative: 0,
+        status: 'active'
       })
     });
     const character = await response.json();
     boardState.characters.push(character);
     document.getElementById('characterName').value = '';
+    document.getElementById('characterHP').value = '10';
+    document.getElementById('characterAC').value = '10';
     renderCharacters();
   } catch (error) {
     console.error('Error adding character:', error);
@@ -157,18 +171,50 @@ function renderCharacters() {
   boardState.characters.forEach(char => {
     const token = document.createElement('div');
     token.className = 'character-token';
+    if (char.status === 'dead') token.classList.add('dead');
+    if (char.status === 'unconscious') token.classList.add('unconscious');
+    
     token.style.left = char.x + 'px';
     token.style.top = char.y + 'px';
     token.style.backgroundColor = char.color;
     token.setAttribute('data-id', char.id);
     token.setAttribute('data-name', char.name);
-    token.textContent = char.name.charAt(0).toUpperCase();
+
+    const hpPercent = (char.currentHP / char.maxHP) * 100;
+    const hpColor = hpPercent > 50 ? '#4caf50' : hpPercent > 25 ? '#ff9800' : '#f44336';
+
+    token.innerHTML = `
+      <div class="character-name">${char.name.substring(0, 11)}</div>
+      <div class="character-hp-bar">
+        <div class="character-hp-fill" style="width: ${hpPercent}%; background: ${hpColor};"></div>
+      </div>
+      <div class="character-stats">
+        <div class="stat-hp">${char.currentHP}/${char.maxHP} HP</div>
+        <div class="stat-ac">AC ${char.ac}</div>
+      </div>
+    `;
 
     // Drag functionality
-    token.addEventListener('mousedown', startDrag);
+    token.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && e.detail === 1) startDrag(e);
+    });
+    
+    // Click to edit (double-click)
+    token.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      openCharacterEditor(char.id);
+    });
+    
+    // Right-click to delete
     token.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       deleteCharacter(char.id);
+    });
+
+    // Scroll to damage/heal
+    token.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      damageCharacter(char.id, e.deltaY > 0 ? 1 : -1);
     });
 
     tokensContainer.appendChild(token);
@@ -177,7 +223,9 @@ function renderCharacters() {
 
 // Drag functionality
 function startDrag(e) {
-  draggingToken = e.target;
+  draggingToken = e.target.closest('.character-token');
+  if (!draggingToken) return;
+  
   draggingToken.classList.add('dragging');
   const rect = draggingToken.getBoundingClientRect();
   const containerRect = canvas.parentElement.getBoundingClientRect();
@@ -200,8 +248,8 @@ function drag(e) {
   y = Math.round(y / gridSize) * gridSize;
 
   // Clamp to canvas
-  x = Math.max(0, Math.min(x, canvas.width - 50));
-  y = Math.max(0, Math.min(y, canvas.height - 50));
+  x = Math.max(0, Math.min(x, canvas.width - 80));
+  y = Math.max(0, Math.min(y, canvas.height - 100));
 
   draggingToken.style.left = x + 'px';
   draggingToken.style.top = y + 'px';
@@ -242,6 +290,154 @@ async function deleteCharacter(id) {
     console.error('Error deleting character:', error);
   }
 }
+
+// Damage character
+async function damageCharacter(id, amount) {
+  const character = boardState.characters.find(c => c.id === id);
+  if (!character) return;
+
+  character.currentHP = Math.max(0, Math.min(character.maxHP, character.currentHP + amount));
+
+  try {
+    await fetch(`/api/characters/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        currentHP: character.currentHP,
+        x: character.x,
+        y: character.y
+      })
+    });
+  } catch (error) {
+    console.error('Error updating HP:', error);
+  }
+
+  renderCharacters();
+}
+
+// Character Editor Modal
+function openCharacterEditor(id) {
+  currentEditingCharacterId = id;
+  const character = boardState.characters.find(c => c.id === id);
+  if (!character) return;
+
+  document.getElementById('modalCharacterName').value = character.name;
+  document.getElementById('modalCurrentHP').value = character.currentHP;
+  document.getElementById('modalMaxHP').value = character.maxHP;
+  document.getElementById('modalAC').value = character.ac;
+  document.getElementById('modalInitiative').value = character.initiative || 0;
+  document.getElementById('modalStatus').value = character.status || 'active';
+
+  updateHPPreview();
+  modal.classList.add('show');
+}
+
+// HP Preview Update
+function updateHPPreview() {
+  const currentHP = parseInt(document.getElementById('modalCurrentHP').value) || 0;
+  const maxHP = parseInt(document.getElementById('modalMaxHP').value) || 1;
+  const percent = Math.max(0, Math.min(100, (currentHP / maxHP) * 100));
+  const fill = document.getElementById('previewHPFill');
+  
+  let bgColor = percent > 50 ? '#4caf50' : percent > 25 ? '#ff9800' : '#f44336';
+  fill.style.width = percent + '%';
+  fill.style.background = `linear-gradient(90deg, ${bgColor}, ${adjustBrightness(bgColor, -20)})`;
+  fill.textContent = `${currentHP}/${maxHP}`;
+}
+
+function adjustBrightness(color, percent) {
+  const num = parseInt(color.replace('#',''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
+    (G<255?G<1?0:G:255)*0x100 +
+    (B<255?B<1?0:B:255))
+    .toString(16).slice(1);
+}
+
+// HP Quick buttons
+document.addEventListener('keyup', updateHPPreview);
+document.addEventListener('change', updateHPPreview);
+document.addEventListener('input', updateHPPreview);
+
+if (document.getElementById('hpMinus5')) {
+  document.getElementById('hpMinus5').addEventListener('click', () => {
+    const input = document.getElementById('modalCurrentHP');
+    input.value = Math.max(0, parseInt(input.value) - 5);
+    updateHPPreview();
+  });
+
+  document.getElementById('hpMinus1').addEventListener('click', () => {
+    const input = document.getElementById('modalCurrentHP');
+    input.value = Math.max(0, parseInt(input.value) - 1);
+    updateHPPreview();
+  });
+
+  document.getElementById('hpPlus1').addEventListener('click', () => {
+    const input = document.getElementById('modalCurrentHP');
+    const maxInput = document.getElementById('modalMaxHP');
+    const max = parseInt(maxInput.value);
+    input.value = Math.min(max, parseInt(input.value) + 1);
+    updateHPPreview();
+  });
+
+  document.getElementById('hpPlus5').addEventListener('click', () => {
+    const input = document.getElementById('modalCurrentHP');
+    const maxInput = document.getElementById('modalMaxHP');
+    const max = parseInt(maxInput.value);
+    input.value = Math.min(max, parseInt(input.value) + 5);
+    updateHPPreview();
+  });
+}
+
+closeBtn.addEventListener('click', () => {
+  modal.classList.remove('show');
+});
+
+cancelBtn.addEventListener('click', () => {
+  modal.classList.remove('show');
+});
+
+window.addEventListener('click', (e) => {
+  if (e.target === modal) {
+    modal.classList.remove('show');
+  }
+});
+
+saveBtn.addEventListener('click', async () => {
+  if (!currentEditingCharacterId) return;
+
+  const character = boardState.characters.find(c => c.id === currentEditingCharacterId);
+  if (!character) return;
+
+  const newData = {
+    name: document.getElementById('modalCharacterName').value,
+    currentHP: parseInt(document.getElementById('modalCurrentHP').value),
+    maxHP: parseInt(document.getElementById('modalMaxHP').value),
+    ac: parseInt(document.getElementById('modalAC').value),
+    initiative: parseFloat(document.getElementById('modalInitiative').value),
+    status: document.getElementById('modalStatus').value,
+    x: character.x,
+    y: character.y
+  };
+
+  try {
+    await fetch(`/api/characters/${currentEditingCharacterId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newData)
+    });
+
+    Object.assign(character, newData);
+    renderCharacters();
+    modal.classList.remove('show');
+  } catch (error) {
+    console.error('Error updating character:', error);
+    alert('Error updating character');
+  }
+});
 
 // Initialize
 loadBoardState();

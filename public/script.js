@@ -1,7 +1,7 @@
 // Game Board State
 let boardState = {
   background: null,
-  gridSize: 40,
+  gridSize: 80,
   characters: []
 };
 
@@ -9,6 +9,9 @@ let selectedToken = null;
 let draggingToken = null;
 let dragOffset = { x: 0, y: 0 };
 let currentEditingCharacterId = null;
+let backgroundImageData = null;
+let gridColor = '#000000';
+let gridAlpha = 0.3;
 
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
@@ -28,6 +31,43 @@ function resizeCanvas() {
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+
+// Detect image brightness and adjust grid color
+function detectImageBrightness(imageUrl) {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    let brightness = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      brightness += (r * 299 + g * 587 + b * 114) / 1000;
+    }
+    brightness /= (data.length / 4);
+    
+    // If image is dark, use light grid; if bright, use dark grid
+    if (brightness < 128) {
+      gridColor = '#FFFFFF';
+      gridAlpha = 0.4;
+    } else {
+      gridColor = '#000000';
+      gridAlpha = 0.3;
+    }
+    
+    drawBoard();
+  };
+  img.src = imageUrl;
+}
 
 // Draw grid and background
 function drawBoard() {
@@ -51,8 +91,9 @@ function drawBoard() {
 
 function drawGrid() {
   const gridSize = boardState.gridSize;
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = gridColor;
+  ctx.globalAlpha = gridAlpha;
+  ctx.lineWidth = 2;
 
   // Vertical lines
   for (let x = 0; x < canvas.width; x += gridSize) {
@@ -69,18 +110,24 @@ function drawGrid() {
     ctx.lineTo(canvas.width, y);
     ctx.stroke();
   }
+
+  ctx.globalAlpha = 1.0;
 }
 
-// Load board state from server
-async function loadBoardState() {
-  try {
-    const response = await fetch('/api/board-state');
-    boardState = await response.json();
-    drawBoard();
-    renderCharacters();
-  } catch (error) {
-    console.error('Error loading board state:', error);
+// Load board state from localStorage
+function loadBoardState() {
+  const savedState = localStorage.getItem('dndBoardState');
+  if (savedState) {
+    boardState = JSON.parse(savedState);
+    document.getElementById('gridSize').value = boardState.gridSize;
   }
+  drawBoard();
+  renderCharacters();
+}
+
+// Save board state to localStorage
+function saveBoardState() {
+  localStorage.setItem('dndBoardState', JSON.stringify(boardState));
 }
 
 // Upload background image
@@ -104,7 +151,8 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
     const data = await response.json();
     if (data.success) {
       boardState.background = data.backgroundUrl;
-      drawBoard();
+      detectImageBrightness(boardState.background);
+      saveBoardState();
       input.value = '';
       alert('Background uploaded successfully!');
     }
@@ -113,6 +161,48 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
     alert('Error uploading background');
   }
 });
+
+// Check if grid square is occupied
+function isGridSquareOccupied(gridX, gridY, excludeId = null) {
+  const gridSize = boardState.gridSize;
+  return boardState.characters.some(char => {
+    if (excludeId && char.id === excludeId) return false;
+    
+    const charGridX = Math.round(char.x / gridSize);
+    const charGridY = Math.round(char.y / gridSize);
+    
+    return charGridX === gridX && charGridY === gridY;
+  });
+}
+
+// Find nearest available grid square
+function findAvailableGridSquare(startX, startY) {
+  const gridSize = boardState.gridSize;
+  const startGridX = Math.round(startX / gridSize);
+  const startGridY = Math.round(startY / gridSize);
+  
+  if (!isGridSquareOccupied(startGridX, startGridY)) {
+    return { x: startGridX * gridSize, y: startGridY * gridSize };
+  }
+  
+  // Search in expanding square pattern
+  for (let radius = 1; radius < 10; radius++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+        
+        const gridX = startGridX + dx;
+        const gridY = startGridY + dy;
+        
+        if (!isGridSquareOccupied(gridX, gridY)) {
+          return { x: gridX * gridSize, y: gridY * gridSize };
+        }
+      }
+    }
+  }
+  
+  return { x: startX, y: startY };
+}
 
 // Add character token
 document.getElementById('addCharacterBtn').addEventListener('click', async () => {
@@ -126,13 +216,17 @@ document.getElementById('addCharacterBtn').addEventListener('click', async () =>
     return;
   }
 
+  const randomX = Math.random() * (canvas.width - 80);
+  const randomY = Math.random() * (canvas.height - 100);
+  const gridPos = findAvailableGridSquare(randomX, randomY);
+
   try {
     const response = await fetch('/api/characters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        x: Math.random() * (canvas.width - 80),
-        y: Math.random() * (canvas.height - 100),
+        x: gridPos.x,
+        y: gridPos.y,
         name,
         color,
         maxHP,
@@ -147,6 +241,7 @@ document.getElementById('addCharacterBtn').addEventListener('click', async () =>
     document.getElementById('characterName').value = '';
     document.getElementById('characterHP').value = '10';
     document.getElementById('characterAC').value = '10';
+    saveBoardState();
     renderCharacters();
   } catch (error) {
     console.error('Error adding character:', error);
@@ -162,6 +257,7 @@ document.getElementById('updateGridBtn').addEventListener('click', () => {
     return;
   }
   boardState.gridSize = gridSize;
+  saveBoardState();
   drawBoard();
 });
 
@@ -242,7 +338,7 @@ function drag(e) {
   let x = e.clientX - containerRect.left - dragOffset.x;
   let y = e.clientY - containerRect.top - dragOffset.y;
 
-  // Snap to grid
+  // Snap to grid center
   const gridSize = boardState.gridSize;
   x = Math.round(x / gridSize) * gridSize;
   y = Math.round(y / gridSize) * gridSize;
@@ -259,8 +355,19 @@ async function stopDrag() {
   if (!draggingToken) return;
 
   const id = draggingToken.getAttribute('data-id');
-  const x = parseInt(draggingToken.style.left);
-  const y = parseInt(draggingToken.style.top);
+  let x = parseInt(draggingToken.style.left);
+  let y = parseInt(draggingToken.style.top);
+
+  // Check if new position is occupied, move to edge if so
+  const gridSize = boardState.gridSize;
+  const gridX = Math.round(x / gridSize);
+  const gridY = Math.round(y / gridSize);
+  
+  if (isGridSquareOccupied(gridX, gridY, id)) {
+    const availablePos = findAvailableGridSquare(x, y);
+    x = availablePos.x;
+    y = availablePos.y;
+  }
 
   try {
     await fetch(`/api/characters/${id}`, {
@@ -276,6 +383,9 @@ async function stopDrag() {
   draggingToken = null;
   document.removeEventListener('mousemove', drag);
   document.removeEventListener('mouseup', stopDrag);
+  
+  saveBoardState();
+  renderCharacters();
 }
 
 // Delete character
@@ -285,6 +395,7 @@ async function deleteCharacter(id) {
   try {
     await fetch(`/api/characters/${id}`, { method: 'DELETE' });
     boardState.characters = boardState.characters.filter(c => c.id !== id);
+    saveBoardState();
     renderCharacters();
   } catch (error) {
     console.error('Error deleting character:', error);
@@ -312,6 +423,7 @@ async function damageCharacter(id, amount) {
     console.error('Error updating HP:', error);
   }
 
+  saveBoardState();
   renderCharacters();
 }
 
@@ -431,6 +543,7 @@ saveBtn.addEventListener('click', async () => {
     });
 
     Object.assign(character, newData);
+    saveBoardState();
     renderCharacters();
     modal.classList.remove('show');
   } catch (error) {
